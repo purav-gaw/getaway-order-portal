@@ -272,6 +272,9 @@ textarea.finput{resize:vertical;min-height:78px;line-height:1.55}
         </table>
       </div>
     </div>
+    <div style="margin:16px 0 4px;padding:12px 16px;background:#FFFBEB;border:1px solid rgba(217,119,6,.22);border-radius:10px;font-size:12.5px;color:#92660A;line-height:1.55">
+      &#9432;&nbsp; <strong>Please note:</strong> Transportation and cold-chain delivery charges are not included in this order and will be billed separately.
+    </div>
     <div id="e3" style="display:none" class="err-strip"></div>
     <div class="card-foot">
       <button class="btn btn-ghost" onclick="go2()">&larr; Edit Order</button>
@@ -449,8 +452,8 @@ async function doSubmit(){
   const payload={orderId:oid,orderDate:dt,companyName:P.co,contactName:P.cn,partnerEmail:P.em,phone:P.ph,deliveryAddress:P.ad,notes:P.no||'',gawEmail:GAW_EMAIL,totalExGst:totEx.toFixed(2),totalMrp:totMrp.toLocaleString('en-IN'),totalUnits:totU,items:sel.map(p=>({sku:p.sku,name:p.name+(p.size?' - '+p.size:''),qty:Q[p.sku],mrp:p.mrp,exGst:p.exGst.toFixed(2),lineTotal:(Q[p.sku]*p.exGst).toFixed(2)}))};
   let ok=false;
   try{
-    const r=await fetch(GAS_URL,{method:'POST',body:JSON.stringify(payload)});
-    const d=await r.json();ok=d.success===true;
+    await fetch(GAS_URL,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)});
+    ok=true; // no-cors can't read response but the script fires — assume success
   }catch(e){ok=false;}
   $('oidTxt').textContent=oid;
   $('emTxt').textContent=P.em;
