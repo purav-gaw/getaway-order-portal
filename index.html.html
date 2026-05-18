@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Getaway Partners | Order Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* ===================================================
+   SETUP INSTRUCTIONS (read before sharing with partners)
+   ===================================================
+   
+   STEP 1 — Google Apps Script (replaces EmailJS, free, unlimited)
+   1. Go to script.google.com → New Project
+   2. Paste the Apps Script code from GAS_SETUP.md into Code.gs
+   3. Click Deploy → New Deployment → Web App
+      - Execute as: Me
+      - Who has access: Anyone
+   4. Copy the Web App URL
+   5. Replace GAS_URL below with your copied URL
+   
+   STEP 2 — GitHub Pages (version control + free hosting)
+   1. github.com → New repository → name: "getaway-order-portal" → Public → Create
+   2. Upload this file (rename to index.html before uploading)
+   3. Settings → Pages → Source: main branch → /root → Save
+   4. Your URL: https://[your-username].github.io/getaway-order-portal
+   5. To update SKUs or prices: edit the PRODUCTS array below → commit → live in 60s
+   
+   =================================================== */
+
+const GAS_URL = 'https://script.google.com/a/macros/getawaydesserts.com/s/AKfycbxrq9to0S8g5miSPynXgSk9z_tFDI03fXpYAl59IyzmwxetJca-QBTkzMm-cxX4BIwaUQ/exec'; // ← paste here after Step 1
+
+:root{
+  --gold:#FABB1D;--gold-h:#FDD55A;--gold-d:#C9940A;
+  --navy:#394E75;--navy-d:#263450;
+  --off:#FAFAF8;--cream:#FDF8EE;
+  --g50:#F8F8F6;--g100:#F0EFE9;--g200:#E0DED5;--g300:#C8C6BB;
+  --g400:#A8A69A;--g500:#7A7870;--g700:#3D3C36;--g900:#1A1916;
+  --ok:#22C55E;--ok-bg:rgba(34,197,94,.09);
+  --err:#EF4444;--err-bg:rgba(239,68,68,.08);
+  --warn:#F59E0B;--warn-bg:rgba(245,158,11,.09);
+  --fd:'DM Serif Display',serif;--fb:'DM Sans',sans-serif;
+  --rsm:6px;--rmd:10px;--rlg:16px;--rxl:22px;--rfull:9999px;
+  --shsm:0 1px 3px rgba(0,0,0,.06);
+  --shmd:0 4px 14px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04);
+  --shgold:0 4px 20px rgba(250,187,29,.28);
+  --ease:cubic-bezier(.4,0,.2,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--fb);background:var(--off);color:var(--g900);min-height:100vh;line-height:1.5}
+
+.hdr{background:white;border-bottom:1px solid var(--g100);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200;box-shadow:var(--shsm)}
+.logo-w{display:flex;align-items:center;gap:12px}
+.logo-img{width:42px;height:42px;border-radius:var(--rmd);object-fit:cover}
+.brand-n{font-family:var(--fd);font-size:19px;color:var(--navy);line-height:1.1}
+.brand-s{font-size:11px;color:var(--g400);letter-spacing:.07em;text-transform:uppercase;font-weight:500}
+.badge{background:var(--cream);border:1.5px solid var(--gold);color:var(--navy);padding:4px 14px;border-radius:var(--rfull);font-size:11.5px;font-weight:700;letter-spacing:.04em}
+
+.prog{background:white;border-bottom:1px solid var(--g100);padding:14px 28px}
+.prog-steps{display:flex;align-items:center;max-width:540px;margin:0 auto}
+.si{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;position:relative}
+.si:not(:last-child)::after{content:'';position:absolute;top:12px;left:50%;width:100%;height:2px;background:var(--g200);z-index:0;transition:background .4s var(--ease)}
+.si.done:not(:last-child)::after{background:var(--gold)}
+.sc{width:26px;height:26px;border-radius:50%;border:2px solid var(--g200);background:white;color:var(--g400);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;position:relative;z-index:1;transition:all .3s var(--ease)}
+.si.active .sc{border-color:var(--navy);background:var(--navy);color:white}
+.si.done .sc{border-color:var(--gold);background:var(--gold);color:var(--navy)}
+.sl{font-size:10px;color:var(--g400);font-weight:500;letter-spacing:.04em;text-transform:uppercase;text-align:center}
+.si.active .sl{color:var(--navy);font-weight:700}
+.si.done .sl{color:var(--gold-d)}
+
+.main{max-width:740px;margin:0 auto;padding:28px 16px 120px}
+.card{background:white;border-radius:var(--rxl);border:1px solid var(--g100);box-shadow:var(--shmd)}
+.ch{padding:20px 28px 16px;border-bottom:1px solid var(--g100)}
+.ct{font-family:var(--fd);font-size:21px;color:var(--navy);margin-bottom:3px}
+.cs{font-size:13px;color:var(--g500)}
+.cb{padding:22px 28px}
+
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.fgrp{display:flex;flex-direction:column;gap:6px}
+.fgrp.full{grid-column:span 2}
+label{font-size:11.5px;font-weight:700;color:var(--g700);letter-spacing:.05em;text-transform:uppercase}
+label.req::after{content:' *';color:var(--err)}
+input,textarea{font-family:var(--fb);font-size:14px;padding:10px 14px;border:1.5px solid var(--g200);border-radius:var(--rmd);color:var(--g900);background:white;transition:border-color .2s,box-shadow .2s;width:100%;outline:none}
+input:focus,textarea:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(57,78,117,.09)}
+input::placeholder,textarea::placeholder{color:var(--g300)}
+textarea{resize:vertical;min-height:76px;line-height:1.5}
+.err-box{background:var(--err-bg);border:1px solid rgba(239,68,68,.25);border-radius:var(--rmd);padding:10px 14px;font-size:13px;color:var(--err);margin-top:14px}
+.warn-box{background:var(--warn-bg);border:1px solid rgba(245,158,11,.3);border-radius:var(--rmd);padding:10px 14px;font-size:13px;color:#92660A;margin-top:14px}
+
+.cat-hdr{display:flex;align-items:center;gap:10px;padding:16px 0 8px}
+.cat-dot{width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0}
+.cat-n{font-size:12px;font-weight:700;color:var(--navy);letter-spacing:.06em;text-transform:uppercase}
+.cat-l{flex:1;height:1px;background:var(--g100)}
+
+.pr{display:grid;grid-template-columns:1fr 88px 72px auto;gap:12px;align-items:center;padding:10px 14px;border-radius:var(--rmd);margin-bottom:4px;border:1.5px solid transparent;background:var(--g50);transition:all .2s var(--ease)}
+.pr.sel{background:var(--cream);border-color:var(--gold)}
+.pn{font-size:13px;font-weight:500;color:var(--g900);margin-bottom:1px}
+.pm{font-size:10.5px;color:var(--g400)}
+.pp .mrp{font-size:13px;font-weight:700;color:var(--navy)}
+.pp .xg{font-size:10px;color:var(--g400)}
+.moq{font-size:10px;background:var(--g100);color:var(--g500);padding:3px 8px;border-radius:var(--rfull);font-weight:700;text-align:center;white-space:nowrap}
+.pr.sel .moq{background:rgba(250,187,29,.2);color:var(--gold-d)}
+.qc{display:flex;align-items:center;border:1.5px solid var(--g200);border-radius:var(--rmd);overflow:hidden;background:white;width:100px}
+.qb{width:30px;height:30px;border:none;background:transparent;cursor:pointer;font-size:17px;color:var(--navy);display:flex;align-items:center;justify-content:center;transition:background .12s;flex-shrink:0;line-height:1;font-family:var(--fb)}
+.qb:hover{background:var(--g100)}
+.qb:disabled{color:var(--g300);cursor:default}
+.qb:disabled:hover{background:transparent}
+.qn{flex:1;text-align:center;font-size:13px;font-weight:700;color:var(--g900);border-left:1px solid var(--g200);border-right:1px solid var(--g200);line-height:28px;min-width:38px}
+
+.sbar{position:fixed;bottom:0;left:0;right:0;background:white;border-top:1px solid var(--g100);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;box-shadow:0 -4px 24px rgba(0,0,0,.07);z-index:100}
+.ss{display:flex;gap:24px}
+.sv{font-size:19px;font-weight:800;color:var(--navy)}
+.sl2{font-size:10px;color:var(--g400);text-transform:uppercase;letter-spacing:.07em;font-weight:500}
+.brow{display:flex;gap:10px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 22px;border-radius:var(--rmd);font-family:var(--fb);font-size:14px;font-weight:700;cursor:pointer;border:none;transition:all .2s var(--ease);white-space:nowrap}
+.btn:active{transform:scale(.98)}
+.btn-n{background:var(--navy);color:white}
+.btn-n:hover{background:var(--navy-d);box-shadow:var(--shmd)}
+.btn-g{background:var(--gold);color:var(--navy)}
+.btn-g:hover{background:var(--gold-h);box-shadow:var(--shgold)}
+.btn-gh{background:transparent;color:var(--g500);border:1.5px solid var(--g200)}
+.btn-gh:hover{background:var(--g50);border-color:var(--g300);color:var(--g700)}
+.btn-lg{padding:13px 28px;font-size:15px}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+
+.ig{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.ii{padding:10px 14px;background:var(--g50);border-radius:var(--rmd)}
+.il{font-size:10px;color:var(--g400);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.iv{font-size:13px;font-weight:500;color:var(--g900)}
+
+.rt{width:100%;border-collapse:collapse}
+.rt th{font-size:10px;color:var(--g400);letter-spacing:.08em;text-transform:uppercase;font-weight:700;padding:8px 10px;text-align:left;border-bottom:1px solid var(--g100);background:var(--g50)}
+.rt td{font-size:13px;padding:10px 10px;border-bottom:1px solid var(--g50);color:var(--g700)}
+.rt tr:last-child td{border-bottom:none}
+.sku{font-family:monospace;font-size:10.5px;color:var(--g400)}
+.tr-total td{font-weight:800;color:var(--navy)!important;font-size:14px!important;border-top:2px solid var(--g200)!important;background:var(--cream)!important}
+
+.success-w{padding:40px 28px;text-align:center}
+.ok-icon{width:68px;height:68px;background:var(--ok-bg);border:2.5px solid var(--ok);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:28px}
+.ok-title{font-family:var(--fd);font-size:25px;color:var(--navy);margin-bottom:8px}
+.ok-msg{font-size:14px;color:var(--g500);max-width:420px;margin:0 auto 20px;line-height:1.65}
+.order-summary-box{background:var(--g50);border:1px solid var(--g200);border-radius:var(--rlg);padding:16px 20px;margin:0 auto 24px;max-width:480px;text-align:left;max-height:200px;overflow-y:auto}
+.order-summary-box h4{font-size:12px;font-weight:700;color:var(--g500);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}
+.order-line{font-size:12px;color:var(--g700);padding:3px 0;border-bottom:1px solid var(--g100);display:flex;justify-content:space-between;gap:8px}
+.order-line:last-child{border-bottom:none}
+.order-total{font-size:13px;font-weight:700;color:var(--navy);padding-top:10px;margin-top:4px;display:flex;justify-content:space-between}
+
+.notice{background:var(--warn-bg);border:1px solid rgba(245,158,11,.3);border-radius:var(--rmd);padding:10px 14px;font-size:12px;color:#92660A;text-align:center;margin-bottom:16px}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.fu{animation:fadeUp .3s var(--ease) forwards}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.35);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+
+@media(max-width:640px){
+  .fg{grid-template-columns:1fr}.fgrp.full{grid-column:span 1}
+  .ig{grid-template-columns:1fr}.cb,.ch{padding:16px}
+  .hdr{padding:12px 16px}.main{padding:16px 8px 140px}
+  .pr{grid-template-columns:1fr auto}.pp,.moq{display:none}
+  .ss{gap:14px}.sbar{flex-wrap:wrap;gap:10px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="logo-w">
+    <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='42' viewBox='0 0 42 42'%3E%3Crect width='42' height='42' rx='8' fill='%23394E75'/%3E%3Ctext x='21' y='15' text-anchor='middle' fill='%23FABB1D' font-size='7' font-weight='700' font-family='sans-serif'%3EGET-A-WAY%3C/text%3E%3Ctext x='21' y='24' text-anchor='middle' fill='white' font-size='6' font-family='sans-serif'%3EDESSERTS%3C/text%3E%3Ctext x='21' y='34' text-anchor='middle' fill='%23FABB1D' font-size='9'%3E🍦%3C/text%3E%3C/svg%3E" alt="Get-A-Way Desserts" class="logo-img">
+    <div><div class="brand-n">Get-A-Way Desserts</div><div class="brand-s">Order Portal</div></div>
+  </div>
+  <div class="badge">GETAWAY PARTNERS</div>
+</header>
+
+<div class="prog">
+  <div class="prog-steps">
+    <div class="si active" id="si1"><div class="sc">1</div><div class="sl">Details</div></div>
+    <div class="si" id="si2"><div class="sc">2</div><div class="sl">Products</div></div>
+    <div class="si" id="si3"><div class="sc">3</div><div class="sl">Review</div></div>
+  </div>
+</div>
+
+<div class="main">
+
+<div id="s1" class="fu">
+  <div class="card">
+    <div class="ch"><div class="ct">Your Details</div><div class="cs">Company info for your invoice and delivery</div></div>
+    <div class="cb">
+      <div class="fg">
+        <div class="fgrp"><label class="req">Company Name</label><input id="fCo" placeholder="e.g. The Oberoi Mumbai" autocomplete="organization"></div>
+        <div class="fgrp"><label class="req">Contact Person</label><input id="fCn" placeholder="Full name" autocomplete="name"></div>
+        <div class="fgrp"><label class="req">Email Address</label><input type="email" id="fEm" placeholder="orders@yourcompany.com" autocomplete="email"></div>
+        <div class="fgrp"><label class="req">Phone</label><input type="tel" id="fPh" placeholder="+91 98765 43210" autocomplete="tel"></div>
+        <div class="fgrp full"><label class="req">Delivery Address</label><textarea id="fAd" placeholder="Full address including city and pincode" rows="3"></textarea></div>
+        <div class="fgrp full"><label>Special Instructions</label><textarea id="fNo" placeholder="Delivery timing, gate number, refrigeration notes..." style="min-height:60px"></textarea></div>
+      </div>
+      <div id="e1" style="display:none" class="err-box"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:20px">
+        <button class="btn btn-n btn-lg" onclick="go2()">Continue to Products &rarr;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="s2" style="display:none" class="fu">
+  <div class="card">
+    <div class="ch">
+      <div class="ct">Select Products</div>
+      <div class="cs">Press <strong>+</strong> to add in MOQ steps &nbsp;&middot;&nbsp; Minimum order quantities are enforced automatically</div>
+    </div>
+    <div class="cb" id="prodList"></div>
+  </div>
+  <div class="sbar">
+    <div class="ss">
+      <div><div class="sv" id="tSk">0</div><div class="sl2">SKUs</div></div>
+      <div><div class="sv" id="tUn">0</div><div class="sl2">Units</div></div>
+      <div><div class="sv" id="tVl">&#8377;0</div><div class="sl2">Value (MRP)</div></div>
+    </div>
+    <div class="brow">
+      <button class="btn btn-gh" onclick="go1()">&larr; Back</button>
+      <button class="btn btn-g btn-lg" id="revBtn" onclick="go3()" disabled>Review Order &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<div id="s3" style="display:none" class="fu">
+  <div class="card">
+    <div class="ch"><div class="ct">Review &amp; Submit</div><div class="cs">Check everything before we send your order</div></div>
+    <div class="cb">
+      <div class="ig" id="revInfo"></div>
+      <div style="overflow-x:auto"><table class="rt"><thead><tr><th>SKU</th><th>Product</th><th>MRP</th><th>Ex-GST</th><th>Qty</th><th>Line Total</th></tr></thead><tbody id="revBody"></tbody></table></div>
+      <div id="e3" style="display:none" class="err-box"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px">
+        <button class="btn btn-gh" onclick="go2()">&larr; Edit Order</button>
+        <button class="btn btn-g btn-lg" id="subBtn" onclick="submit()">Submit Order &#127874;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="s4" style="display:none" class="fu">
+  <div class="card">
+    <div class="success-w">
+      <div class="ok-icon">&#10003;</div>
+      <div class="ok-title">Order Placed!</div>
+      <div class="ok-msg">Order ID: <strong id="oidDisplay"></strong><br>Confirmation sent to <strong id="emDisplay"></strong> and our team.</div>
+      <div class="order-summary-box" id="summaryBox"></div>
+      <div id="emailNotice" style="display:none" class="notice">&#9888; Email may take a few minutes. Your order details are shown above — screenshot or copy as backup.</div>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-n btn-lg" onclick="dlXL()">&#11015; Download Excel (SupplyNote format)</button>
+        <button class="btn btn-gh" onclick="resetAll()">Place Another Order</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+<script>
+// ============================================================
+// CONFIG — paste your Google Apps Script URL here after setup
+// ============================================================
+const GAS_URL = 'YOUR_GOOGLE_APPS_SCRIPT_URL';
+const GAW_EMAIL = 'purav@getawaydesserts.com';
+
+// ============================================================
+// PRODUCTS — edit this array to add/change SKUs and prices
+// ============================================================
+const PRODUCTS = [
+  // Ice Cream 100ml
+  {sku:'GAW838',name:'Blueberry Cheesecake Ice Cream',size:'100 ml',mrp:120,exGst:114.2857,moq:12,shelf:365,cat:'Ice Cream 100 ml'},
+  {sku:'GAW861',name:'Mango Ice Cream',size:'100 ml',mrp:120,exGst:114.2857,moq:12,shelf:365,cat:'Ice Cream 100 ml'},
+  {sku:'GAW892',name:'Chocolate Brownie Fudge Ice Cream',size:'100 ml',mrp:120,exGst:114.2857,moq:12,shelf:365,cat:'Ice Cream 100 ml'},
+  {sku:'GAW894',name:'Belgian Chocolate Ice Cream',size:'100 ml',mrp:120,exGst:114.2857,moq:12,shelf:365,cat:'Ice Cream 100 ml'},
+  // Ice Cream 500ml
+  {sku:'GAW004',name:'Chocolate Brownie Fudge Ice Cream',size:'500 ml',mrp:445,exGst:423.8095,moq:4,shelf:365,cat:'Ice Cream 500 ml'},
+  {sku:'GAW002',name:'Belgian Chocolate Ice Cream',size:'500 ml',mrp:445,exGst:423.8095,moq:4,shelf:365,cat:'Ice Cream 500 ml'},
+  {sku:'GAW041',name:'Blueberry Cheesecake Ice Cream',size:'500 ml',mrp:445,exGst:423.8095,moq:4,shelf:365,cat:'Ice Cream 500 ml'},
+  {sku:'GAW007',name:'Mango Ice Cream',size:'500 ml',mrp:445,exGst:423.8095,moq:4,shelf:365,cat:'Ice Cream 500 ml'},
+  // Cones 110ml
+  {sku:'GAW774',name:'Cone Dark Chocolate',size:'110 ml',mrp:120,exGst:114.2857,moq:10,shelf:365,cat:'Cones 110 ml'},
+  {sku:'GAW775',name:'Cone Brownie Chocolate',size:'110 ml',mrp:120,exGst:114.2857,moq:10,shelf:365,cat:'Cones 110 ml'},
+  {sku:'GAW873',name:'Cone Blueberry Cheesecake',size:'110 ml',mrp:120,exGst:114.2857,moq:10,shelf:365,cat:'Cones 110 ml'},
+  // Duets 60ml
+  {sku:'GAW904',name:'Raspberry Duet',size:'60 ml',mrp:120,exGst:114.2857,moq:12,shelf:365,cat:'Duets 60 ml'},
+  {sku:'GAW906',name:'Mango Duet',size:'60 ml',mrp:120,exGst:114.2857,moq:12,shelf:365,cat:'Duets 60 ml'},
+  // Ice Pops
+  {sku:'GAW030',name:'Guava Chilli Ice Pop',size:'',mrp:104,exGst:99.0476,moq:9,shelf:365,cat:'Ice Pops'},
+  {sku:'GAW027',name:'Orange Ice Pop',size:'',mrp:104,exGst:99.0476,moq:9,shelf:365,cat:'Ice Pops'},
+  {sku:'GAW440',name:'Tender Coconut Litchi Ice Pop',size:'',mrp:104,exGst:99.0476,moq:9,shelf:365,cat:'Ice Pops'},
+  {sku:'GAW441',name:'Strawberry Raspberry Ice Pop',size:'',mrp:104,exGst:99.0476,moq:9,shelf:365,cat:'Ice Pops'},
+  // Kulfi
+  {sku:'GAW033',name:'Malai Kulfi',size:'',mrp:75,exGst:71.4286,moq:12,shelf:180,cat:'Kulfi'},
+  {sku:'GAW035',name:'Roasted Almond Kulfi',size:'',mrp:75,exGst:71.4286,moq:12,shelf:180,cat:'Kulfi'},
+  // Crunch Bars
+  {sku:'GAW438',name:'Brownie Crunch Bar',size:'',mrp:120,exGst:114.2857,moq:9,shelf:365,cat:'Crunch Bars'},
+  {sku:'GAW439',name:'Hazel Nut Crunch Bar',size:'',mrp:120,exGst:114.2857,moq:9,shelf:365,cat:'Crunch Bars'},
+  // Specialties
+  {sku:'GAW023',name:'Choco Cookie Brownie Fudge Ice Cream Sandwich',size:'',mrp:100,exGst:95.2381,moq:12,shelf:180,cat:'Specialties'},
+  {sku:'GAW204',name:'Black Forest Ice Cream Pastry',size:'',mrp:155,exGst:147.619,moq:8,shelf:270,cat:'Specialties'},
+  {sku:'GAW671',name:'Hot Fudge Ice Cream Pastry',size:'',mrp:155,exGst:147.619,moq:8,shelf:270,cat:'Specialties'},
+  {sku:'GAW702',name:'Cassata',size:'125 ml',mrp:125,exGst:119.0476,moq:6,shelf:270,cat:'Specialties'},
+  {sku:'GAW911',name:'Triple Chocolate Ice Cream Cake',size:'300 gm',mrp:533,exGst:507.619,moq:1,shelf:270,cat:'Specialties'},
+  // Cheesecake Jars
+  {sku:'GAW736',name:'Hazelnut Choco Cheesecake Jar',size:'',mrp:250,exGst:238.0952,moq:8,shelf:180,cat:'Cheesecake Jars'},
+  {sku:'GAW737',name:'Blueberry Cheesecake Jar',size:'',mrp:200,exGst:190.4762,moq:8,shelf:180,cat:'Cheesecake Jars'},
+  {sku:'GAW738',name:'Tiramisu Jar',size:'',mrp:250,exGst:238.0952,moq:8,shelf:180,cat:'Cheesecake Jars'},
+  {sku:'GAW739',name:'Death by Chocolate Jar',size:'',mrp:230,exGst:219.0476,moq:8,shelf:180,cat:'Cheesecake Jars'},
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let Q={}, P={}, lastOrder=null;
+
+function $(id){return document.getElementById(id)}
+function v(id){return $(id).value.trim()}
+function cats(){return[...new Set(PRODUCTS.map(p=>p.cat))]}
+
+// ============================================================
+// RENDER PRODUCTS
+// ============================================================
+function renderProds(){
+  $('prodList').innerHTML = cats().map(cat=>{
+    const ps=PRODUCTS.filter(p=>p.cat===cat);
+    return `<div class="cat-hdr"><div class="cat-dot"></div><div class="cat-n">${cat}</div><div class="cat-l"></div></div>
+    ${ps.map(p=>rowHTML(p)).join('')}`;
+  }).join('');
+}
+
+function rowHTML(p){
+  const q=Q[p.sku]||0;
+  return `<div class="pr${q>0?' sel':''}" id="pr-${p.sku}">
+    <div>
+      <div class="pn">${p.name}${p.size?` <span style="color:var(--g400);font-weight:400;font-size:12px;">— ${p.size}</span>`:''}</div>
+      <div class="pm">SKU: ${p.sku} &middot; Shelf: ${p.shelf}d</div>
+    </div>
+    <div class="pp"><div class="mrp">&#8377;${p.mrp}</div><div class="xg">&#8377;${p.exGst.toFixed(2)} ex-GST</div></div>
+    <div class="moq">MOQ: ${p.moq}</div>
+    <div class="qc">
+      <button class="qb" onclick="chg('${p.sku}',-1)" ${q===0?'disabled':''}>&minus;</button>
+      <div class="qn">${q}</div>
+      <button class="qb" onclick="chg('${p.sku}',1)">+</button>
+    </div>
+  </div>`;
+}
+
+function chg(sku,dir){
+  const p=PRODUCTS.find(x=>x.sku===sku);
+  const cur=Q[sku]||0;
+  if(dir===1) Q[sku]=cur===0?p.moq:cur+p.moq;
+  else{ const n=cur-p.moq; if(n<=0)delete Q[sku]; else Q[sku]=n; }
+  $('pr-'+sku).outerHTML=rowHTML(p);
+  updateBar();
+}
+
+function updateBar(){
+  const sel=PRODUCTS.filter(p=>Q[p.sku]);
+  $('tSk').textContent=sel.length;
+  $('tUn').textContent=sel.reduce((s,p)=>s+(Q[p.sku]||0),0);
+  $('tVl').textContent='₹'+sel.reduce((s,p)=>s+(Q[p.sku]||0)*p.mrp,0).toLocaleString('en-IN');
+  $('revBtn').disabled=sel.length===0;
+}
+
+// ============================================================
+// STEP NAVIGATION
+// ============================================================
+function setStep(n){
+  [1,2,3].forEach(i=>{
+    const el=$('si'+i), c=el.querySelector('.sc');
+    el.className='si';
+    if(i<n){el.classList.add('done');c.textContent='✓';}
+    else if(i===n){el.classList.add('active');c.textContent=i;}
+    else c.textContent=i;
+  });
+}
+function show(n){
+  [1,2,3,4].forEach(i=>{const e=$('s'+i);if(e)e.style.display='none';});
+  const t=$('s'+n); t.style.display='block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function go1(){setStep(1);show(1);}
+
+function go2(){
+  const errs=[];
+  if(!v('fCo')) errs.push('Company Name');
+  if(!v('fCn')) errs.push('Contact Person');
+  if(!v('fEm')||!/^[^@]+@[^@]+\.[^@]+$/.test(v('fEm'))) errs.push('Valid Email');
+  if(!v('fPh')) errs.push('Phone');
+  if(!v('fAd')) errs.push('Delivery Address');
+  if(errs.length){$('e1').textContent='Please fill in: '+errs.join(', ');$('e1').style.display='block';return;}
+  $('e1').style.display='none';
+  P={co:v('fCo'),cn:v('fCn'),em:v('fEm'),ph:v('fPh'),ad:v('fAd'),no:v('fNo')};
+  setStep(2);show(2);
+}
+
+function go3(){
+  const sel=PRODUCTS.filter(p=>Q[p.sku]);
+  if(!sel.length) return;
+  $('revInfo').innerHTML=`
+    <div class="ii"><div class="il">Company</div><div class="iv">${P.co}</div></div>
+    <div class="ii"><div class="il">Contact</div><div class="iv">${P.cn}</div></div>
+    <div class="ii"><div class="il">Email</div><div class="iv">${P.em}</div></div>
+    <div class="ii"><div class="il">Phone</div><div class="iv">${P.ph}</div></div>
+    <div class="ii" style="grid-column:span 2"><div class="il">Delivery Address</div><div class="iv">${P.ad}</div></div>
+    ${P.no?`<div class="ii" style="grid-column:span 2"><div class="il">Notes</div><div class="iv">${P.no}</div></div>`:''}`;
+  let totEx=0,totMrp=0,totU=0;
+  const rows=sel.map(p=>{
+    const q=Q[p.sku],le=q*p.exGst,lm=q*p.mrp;
+    totEx+=le;totMrp+=lm;totU+=q;
+    return `<tr><td class="sku">${p.sku}</td><td><strong>${p.name}</strong>${p.size?` <span style="color:var(--g400);font-size:11px;">— ${p.size}</span>`:''}</td><td>&#8377;${p.mrp}</td><td>&#8377;${p.exGst.toFixed(2)}</td><td><strong>${q}</strong></td><td><strong>&#8377;${le.toFixed(2)}</strong></td></tr>`;
+  }).join('');
+  $('revBody').innerHTML=rows+`<tr class="tr-total"><td colspan="4">TOTAL</td><td>${totU} units</td><td>&#8377;${totEx.toFixed(2)}<br><span style="font-size:11px;font-weight:500;color:var(--g500)">MRP &#8377;${totMrp.toLocaleString('en-IN')}</span></td></tr>`;
+  setStep(3);show(3);
+}
+
+// ============================================================
+// SUBMIT — sends to Google Apps Script, falls back gracefully
+// ============================================================
+async function submit(){
+  const btn=$('subBtn');
+  btn.disabled=true;
+  btn.innerHTML='<div class="spin"></div> Sending...';
+  const sel=PRODUCTS.filter(p=>Q[p.sku]);
+  const oid='GAW-'+Date.now().toString().slice(-6);
+  const dt=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const totEx=sel.reduce((s,p)=>s+Q[p.sku]*p.exGst,0);
+  const totMrp=sel.reduce((s,p)=>s+Q[p.sku]*p.mrp,0);
+  const totU=sel.reduce((s,p)=>s+Q[p.sku],0);
+  lastOrder={sel,oid,dt,totEx,totMrp};
+
+  const payload={
+    orderId:oid, orderDate:dt,
+    companyName:P.co, contactName:P.cn, partnerEmail:P.em,
+    phone:P.ph, deliveryAddress:P.ad, notes:P.no||'',
+    gawEmail:GAW_EMAIL, totalExGst:totEx.toFixed(2),
+    totalMrp:totMrp.toLocaleString('en-IN'), totalUnits:totU,
+    items:sel.map(p=>({sku:p.sku,name:p.name+(p.size?' - '+p.size:''),qty:Q[p.sku],mrp:p.mrp,exGst:p.exGst.toFixed(2),lineTotal:(Q[p.sku]*p.exGst).toFixed(2)}))
+  };
+
+  let emailOk=false;
+  if(GAS_URL && GAS_URL!=='YOUR_GOOGLE_APPS_SCRIPT_URL'){
+    try{
+      const r=await fetch(GAS_URL,{method:'POST',body:JSON.stringify(payload)});
+      const d=await r.json();
+      emailOk=d.success===true;
+    }catch(e){emailOk=false;}
+  }
+
+  // Always show order on screen (Challenger's point — never trust silent email)
+  $('oidDisplay').textContent=oid;
+  $('emDisplay').textContent=P.em;
+  $('summaryBox').innerHTML=`<h4>Order Summary &mdash; ${oid}</h4>`+
+    sel.map(p=>`<div class="order-line"><span>${p.name}${p.size?' ('+p.size+')':''}</span><span style="white-space:nowrap;font-weight:600">×${Q[p.sku]} &nbsp; &#8377;${(Q[p.sku]*p.exGst).toFixed(0)}</span></div>`).join('')+
+    `<div class="order-total"><span>Total Ex-GST</span><span>&#8377;${totEx.toFixed(2)}</span></div>`;
+
+  if(!emailOk) $('emailNotice').style.display='block';
+
+  // Auto-download Excel
+  dlXL();
+  show(4);
+}
+
+// ============================================================
+// EXCEL EXPORT — exact SupplyNote upload format
+// ============================================================
+function dlXL(){
+  if(!lastOrder) return;
+  const {sel,oid,dt}=lastOrder;
+  const ws1=XLSX.utils.aoa_to_sheet([
+    ['SKU','NAME','Shelf Life (Days)','Ex-GST','MRP','MOQ','Order Qty'],
+    ...sel.map(p=>[p.sku,p.name+(p.size?' - '+p.size:''),p.shelf,+p.exGst.toFixed(4),p.mrp,p.moq,Q[p.sku]])
+  ]);
+  ws1['!cols']=[{wch:10},{wch:48},{wch:16},{wch:12},{wch:8},{wch:8},{wch:10}];
+  const ws2=XLSX.utils.aoa_to_sheet([
+    ['Order ID',oid],['Order Date',dt],['',''],
+    ['Company',P.co],['Contact',P.cn],['Email',P.em],
+    ['Phone',P.ph],['Delivery Address',P.ad],['Notes',P.no||''],['',''],
+    ['Total Ex-GST','₹'+lastOrder.totEx.toFixed(2)],
+    ['Total MRP','₹'+lastOrder.totMrp.toLocaleString('en-IN')],
+  ]);
+  ws2['!cols']=[{wch:20},{wch:50}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws1,'SKU List');
+  XLSX.utils.book_append_sheet(wb,ws2,'Order Info');
+  XLSX.writeFile(wb,`GAW_Order_${oid}_${P.co.replace(/[^a-zA-Z0-9]/g,'_')}.xlsx`);
+}
+
+// ============================================================
+// RESET
+// ============================================================
+function resetAll(){
+  Q={};P={};lastOrder=null;
+  ['fCo','fCn','fEm','fPh','fAd','fNo'].forEach(id=>$(id).value='');
+  renderProds();updateBar();setStep(1);show(1);
+}
+
+// Init
+renderProds();
+</script>
+</body>
+</html>
