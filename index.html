@@ -241,6 +241,7 @@ textarea.finput{resize:vertical;min-height:78px;line-height:1.55}
       <div class="card-h">Select Products</div>
       <div class="card-s">Press <strong>+</strong> to add &mdash; quantities increase in MOQ steps automatically</div>
     </div>
+    <div id="giftBanner" style="display:none;margin:0 32px;padding:11px 16px;border-radius:10px;border:1px solid;font-size:13px;line-height:1.5"></div>
     <div class="card-body" id="prodList" style="padding-bottom:8px"></div>
   </div>
   <div class="sbar">
@@ -275,6 +276,9 @@ textarea.finput{resize:vertical;min-height:78px;line-height:1.55}
     <div style="margin:16px 0 4px;padding:12px 16px;background:#FFFBEB;border:1px solid rgba(217,119,6,.22);border-radius:10px;font-size:12.5px;color:#92660A;line-height:1.55">
       &#9432;&nbsp; <strong>Please note:</strong> Transportation and cold-chain delivery charges are not included in this order and will be billed separately.
     </div>
+    <div id="reviewGiftNote" style="display:none;margin:8px 0 4px;padding:12px 16px;background:#F0FDF4;border:1px solid rgba(22,163,74,.3);border-radius:10px;font-size:12.5px;color:#166534;line-height:1.55">
+      &#127873;&nbsp; <strong>Free products worth &#8377;10,000 unlocked!</strong> Our team will contact you to confirm your complimentary selection before delivery.
+    </div>
     <div id="e3" style="display:none" class="err-strip"></div>
     <div class="card-foot">
       <button class="btn btn-ghost" onclick="go2()">&larr; Edit Order</button>
@@ -306,6 +310,9 @@ textarea.finput{resize:vertical;min-height:78px;line-height:1.55}
 // CONFIG
 const GAS_URL = 'https://script.google.com/a/macros/getawaydesserts.com/s/AKfycbxrq9to0S8g5miSPynXgSk9z_tFDI03fXpYAl59IyzmwxetJca-QBTkzMm-cxX4BIwaUQ/exec';
 const GAW_EMAIL = 'purav@getawaydesserts.com';
+const NAHUSH_EMAIL = 'nahush@getawaydesserts.com';
+const FREE_GIFT_THRESHOLD = 40000;
+const FREE_GIFT_VALUE = 10000;
 
 // PRODUCTS — edit name/mrp/moq here to update live
 const PRODUCTS = [
@@ -339,6 +346,10 @@ const PRODUCTS = [
   {sku:'GAW737',name:'Blueberry Cheesecake Jar',size:'',mrp:200,exGst:190.4762,moq:8,shelf:180,cat:'Cheesecake Jars'},
   {sku:'GAW738',name:'Tiramisu Jar',size:'',mrp:250,exGst:238.0952,moq:8,shelf:180,cat:'Cheesecake Jars'},
   {sku:'GAW739',name:'Death by Chocolate Jar',size:'',mrp:230,exGst:219.0476,moq:8,shelf:180,cat:'Cheesecake Jars'},
+  // Chocolate Bars — NEW
+  {sku:'GAW949',name:'GETAWAY Vanilla Chocobar',size:'',mrp:100,exGst:95.2381,moq:9,shelf:365,cat:'Chocolate Bars'},
+  {sku:'GAW950',name:'GETAWAY Dark Truffle Bar',size:'',mrp:120,exGst:114.2857,moq:9,shelf:365,cat:'Chocolate Bars'},
+  {sku:'GAW948',name:'GETAWAY Almond Crunch Bar',size:'',mrp:120,exGst:114.2857,moq:9,shelf:365,cat:'Chocolate Bars'},
 ];
 
 let Q={},P={},lastOrder=null;
@@ -380,10 +391,25 @@ function chg(sku,dir){
 
 function updateBar(){
   const sel=PRODUCTS.filter(p=>Q[p.sku]);
+  const totalMrp=sel.reduce((s,p)=>s+(Q[p.sku]||0)*p.mrp,0);
   $('tSk').textContent=sel.length;
   $('tUn').textContent=sel.reduce((s,p)=>s+(Q[p.sku]||0),0);
-  $('tVl').textContent='₹'+sel.reduce((s,p)=>s+(Q[p.sku]||0)*p.mrp,0).toLocaleString('en-IN');
+  $('tVl').textContent='₹'+totalMrp.toLocaleString('en-IN');
   $('revBtn').disabled=sel.length===0;
+  // Free gift threshold banner
+  const banner=$('giftBanner');
+  if(totalMrp>=FREE_GIFT_THRESHOLD){
+    banner.innerHTML='&#127873; Your order qualifies for <strong>free products worth &#8377;'+FREE_GIFT_VALUE.toLocaleString('en-IN')+'</strong>! Our team will reach out to confirm your free selection.';
+    banner.style.background='#F0FDF4';banner.style.borderColor='rgba(22,163,74,.3)';banner.style.color='#166534';
+    banner.style.display='block';
+  } else if(totalMrp>0){
+    const gap=(FREE_GIFT_THRESHOLD-totalMrp).toLocaleString('en-IN');
+    banner.innerHTML='&#127873; Add <strong>&#8377;'+gap+' more</strong> to unlock free products worth &#8377;'+FREE_GIFT_VALUE.toLocaleString('en-IN')+'!';
+    banner.style.background='#FFFBEB';banner.style.borderColor='rgba(217,119,6,.25)';banner.style.color='#92660A';
+    banner.style.display='block';
+  } else {
+    banner.style.display='none';
+  }
 }
 
 function setStep(n){
@@ -435,6 +461,9 @@ function go3(){
     return `<tr><td><span class="skucode">${p.sku}</span></td><td><strong>${p.name}</strong>${p.size?` <span style="color:var(--g400);font-size:11px;"> — ${p.size}</span>`:''}</td><td>&#8377;${p.mrp}</td><td>&#8377;${p.exGst.toFixed(2)}</td><td><strong>${q}</strong></td><td><strong>&#8377;${le.toFixed(2)}</strong></td></tr>`;
   }).join('');
   $('revBody').innerHTML=rows+`<tr class="tot-row"><td colspan="4"><strong>TOTAL</strong></td><td><strong>${totU} units</strong></td><td><strong>&#8377;${totEx.toFixed(2)}</strong><div style="font-size:11px;font-weight:500;color:var(--g500);margin-top:2px">MRP &#8377;${totMrp.toLocaleString('en-IN')}</div></td></tr>`;
+  // Show free gift note if order qualifies
+  const totMrpVal=sel.reduce((s,p)=>s+Q[p.sku]*p.mrp,0);
+  $('reviewGiftNote').style.display=totMrpVal>=FREE_GIFT_THRESHOLD?'block':'none';
   setStep(3);show(3);
 }
 
@@ -452,8 +481,11 @@ async function doSubmit(){
   const payload={orderId:oid,orderDate:dt,companyName:P.co,contactName:P.cn,partnerEmail:P.em,phone:P.ph,deliveryAddress:P.ad,notes:P.no||'',gawEmail:GAW_EMAIL,totalExGst:totEx.toFixed(2),totalMrp:totMrp.toLocaleString('en-IN'),totalUnits:totU,items:sel.map(p=>({sku:p.sku,name:p.name+(p.size?' - '+p.size:''),qty:Q[p.sku],mrp:p.mrp,exGst:p.exGst.toFixed(2),lineTotal:(Q[p.sku]*p.exGst).toFixed(2)}))};
   let ok=false;
   try{
+    // Send to Purav
     await fetch(GAS_URL,{method:'POST',mode:'no-cors',body:JSON.stringify(payload)});
-    ok=true; // no-cors can't read response but the script fires — assume success
+    // Send to Nahush (same email, different recipient)
+    await fetch(GAS_URL,{method:'POST',mode:'no-cors',body:JSON.stringify({...payload,gawEmail:NAHUSH_EMAIL})});
+    ok=true;
   }catch(e){ok=false;}
   $('oidTxt').textContent=oid;
   $('emTxt').textContent=P.em;
